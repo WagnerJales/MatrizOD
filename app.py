@@ -74,7 +74,7 @@ view_state = pdk.ViewState(
     zoom=11
 )
 
-st.title("Visualizador de Matriz OD com GeoJSON")
+st.title("Visualizador de Matriz OD")
 st.pydeck_chart(pdk.Deck(layers=[geo_layer, line_layer], initial_view_state=view_state))
 
 st.subheader("Tabela de pares OD filtrados")
