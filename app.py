@@ -38,11 +38,13 @@ df_od["orig_lat"], df_od["orig_lon"] = zip(*df_od["origem"].map(lambda x: zone_c
 df_od["dest_lat"], df_od["dest_lon"] = zip(*df_od["destino"].map(lambda x: zone_centroids.get(x, (None, None))))
 
 # Filtros
-st.sidebar.title("Filtros")
-origem_sel = st.sidebar.selectbox("Origem", ["Todas"] + sorted(df_od["origem"].unique().tolist()))
-destino_sel = st.sidebar.selectbox("Destino", ["Todas"] + sorted(df_od["destino"].unique().tolist()))
-vol_range = st.sidebar.slider("Volume", 0, int(df_od["volume"].max()), (0, int(df_od["volume"].max())))
+with st.sidebar:
+    st.markdown("## Filtros")
+    origem_sel = st.selectbox("Origem", ["Todas"] + sorted(df_od["origem"].unique().tolist()))
+    destino_sel = st.selectbox("Destino", ["Todas"] + sorted(df_od["destino"].unique().tolist()))
+    vol_range = st.slider("Volume", 0, int(df_od["volume"].max()), (0, int(df_od["volume"].max())))
 
+# Filtragem
 df_filtrado = df_od.copy()
 if origem_sel != "Todas":
     df_filtrado = df_filtrado[df_filtrado["origem"] == origem_sel]
@@ -50,7 +52,7 @@ if destino_sel != "Todas":
     df_filtrado = df_filtrado[df_filtrado["destino"] == destino_sel]
 df_filtrado = df_filtrado[(df_filtrado["volume"] >= vol_range[0]) & (df_filtrado["volume"] <= vol_range[1])]
 
-# Criar linhas
+# Criar linhas OD
 od_lines = [
     {
         "from_lat": row.orig_lat, "from_lon": row.orig_lon,
@@ -61,7 +63,7 @@ od_lines = [
     if pd.notnull(row.orig_lat) and pd.notnull(row.dest_lat)
 ]
 
-# Layers do primeiro mapa (OD)
+# Layers de mapas
 geo_layer = pdk.Layer(
     "GeoJsonLayer",
     geojson_data,
@@ -83,7 +85,6 @@ line_layer = pdk.Layer(
     pickable=True
 )
 
-# Layers do segundo mapa (gradiente por volume)
 choropleth_layer = pdk.Layer(
     "GeoJsonLayer",
     geojson_data,
@@ -111,24 +112,29 @@ text_layer = pdk.Layer(
     billboard=True
 )
 
+# View inicial
 view_state = pdk.ViewState(
     latitude=sum(c[0] for c in zone_centroids.values()) / len(zone_centroids),
     longitude=sum(c[1] for c in zone_centroids.values()) / len(zone_centroids),
     zoom=11
 )
 
-# Título e visualizações
-st.title("Visualizador de Matriz OD com GeoJSON")
+# Layout tipo "dashboard" com título centralizado e mapas lado a lado
+st.markdown("""
+    <div style='text-align:center'>
+        <h1 style='margin-bottom: 10px;'>Matriz OD</h1>
+    </div>
+""", unsafe_allow_html=True)
 
-col1, col2 = st.columns(2)
+col1, col2 = st.columns([1, 1])
 
 with col1:
-    st.subheader("Mapa OD - Conexões")
-    st.pydeck_chart(pdk.Deck(layers=[geo_layer, line_layer], initial_view_state=view_state))
+    st.pydeck_chart(pdk.Deck(layers=[geo_layer, line_layer], initial_view_state=view_state, map_style="mapbox://styles/mapbox/dark-v10"))
 
 with col2:
-    st.subheader("Mapa de Volume por Zona (Gradiente)")
-    st.pydeck_chart(pdk.Deck(layers=[choropleth_layer, text_layer], initial_view_state=view_state))
+    st.markdown("<h3 style='text-align:center;'>Geração/Atração de viagens</h3>", unsafe_allow_html=True)
+    st.pydeck_chart(pdk.Deck(layers=[choropleth_layer, text_layer], initial_view_state=view_state, map_style="mapbox://styles/mapbox/light-v9"))
 
+# Tabela final
 st.subheader("Tabela de pares OD filtrados")
 st.dataframe(df_filtrado.sort_values("volume", ascending=False))
