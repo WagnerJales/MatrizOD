@@ -4,6 +4,7 @@ import pydeck as pdk
 import json
 from shapely.geometry import shape
 
+# Configuração da página deve ser a primeira chamada Streamlit
 st.set_page_config(layout="wide")
 
 @st.cache_data
