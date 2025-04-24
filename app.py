@@ -4,7 +4,6 @@ import pydeck as pdk
 import json
 from shapely.geometry import shape
 
-# Configuração da página deve ser a primeira chamada Streamlit
 st.set_page_config(layout="wide")
 
 @st.cache_data
@@ -18,21 +17,19 @@ geojson_data, df_od = load_data()
 
 zone_centroids = {}
 zone_trip_counts = {}
+total_geracao = df_od.groupby("origem")["volume"].sum().to_dict()
+total_atracao = df_od.groupby("destino")["volume"].sum().to_dict()
+
 for feature in geojson_data["features"]:
     zone_id = int(feature["properties"]["id"])
     geom = shape(feature["geometry"])
     centroid = geom.centroid
     zone_centroids[zone_id] = (centroid.y, centroid.x)
-    zone_trip_counts[zone_id] = 0
-
-total_by_zone = df_od.groupby("origem")["volume"].sum().to_dict()
-max_volume = max(total_by_zone.values()) if total_by_zone else 1
-for zone_id in zone_trip_counts:
-    zone_trip_counts[zone_id] = total_by_zone.get(zone_id, 0)
-
-for feature in geojson_data["features"]:
-    zone_id = int(feature["properties"]["id"])
-    feature["properties"]["volume"] = zone_trip_counts.get(zone_id, 0)
+    geracao = total_geracao.get(zone_id, 0)
+    atracao = total_atracao.get(zone_id, 0)
+    feature["properties"]["geracao"] = geracao
+    feature["properties"]["atracao"] = atracao
+    feature["properties"]["total"] = geracao + atracao
 
 @st.cache_data
 def compute_coordinates(df):
@@ -49,14 +46,18 @@ with st.sidebar:
     destino_sel = st.selectbox("Destino", ["Todas"] + sorted(df_od["destino"].unique().tolist()))
     vol_range = st.slider("Volume", 0, int(df_od["volume"].max()), (0, int(df_od["volume"].max())))
 
+    st.markdown("### Tipo de Visualização")
+    tipo_dado = st.radio("Exibir no 2º mapa:", ["total", "geracao", "atracao"], index=0)
+
+max_valor = max([f["properties"][tipo_dado] for f in geojson_data["features"]]) or 1
+
+# Filtragem principal
 df_filtrado = df_od.copy()
 if origem_sel != "Todas":
     df_filtrado = df_filtrado[df_filtrado["origem"] == origem_sel]
 if destino_sel != "Todas":
     df_filtrado = df_filtrado[df_filtrado["destino"] == destino_sel]
 df_filtrado = df_filtrado[(df_filtrado["volume"] >= vol_range[0]) & (df_filtrado["volume"] <= vol_range[1])]
-
-# Limita visualmente para performance
 df_limitado = df_filtrado.head(500)
 
 od_lines = [
@@ -93,8 +94,8 @@ line_layer = pdk.Layer(
 choropleth_layer = pdk.Layer(
     "GeoJsonLayer",
     geojson_data,
-    get_fill_color=f"[255 * properties.volume / {max_volume}, 100, 100, 200]",
-    get_line_color=[80, 80, 80, 100],
+    get_fill_color=f"[255 * properties.{tipo_dado} / {max_valor}, 100, 100, 180]",
+    get_line_color=[90, 90, 90, 120],
     pickable=True,
     filled=True,
     stroked=True,
@@ -106,13 +107,13 @@ text_layer = pdk.Layer(
     [{
         "position": [centroid[1], centroid[0]],
         "text": str(zone_id),
-        "size": 16,
+        "size": 14,
         "color": [0, 0, 0],
         "alignment_baseline": "center"
     } for zone_id, centroid in zone_centroids.items()],
     get_position="position",
     get_text="text",
-    get_size=16,
+    get_size=14,
     get_color="color",
     billboard=True
 )
@@ -129,19 +130,21 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-col1, col2 = st.columns([1, 1])
+col1, col2 = st.columns([1, 1], gap="small")
 
 with col1:
+    st.markdown("<h4 style='text-align:center;'>Matriz OD</h4>", unsafe_allow_html=True)
     st.pydeck_chart(pdk.Deck(layers=[geo_layer, line_layer], initial_view_state=view_state, map_style="mapbox://styles/mapbox/dark-v10"))
 
 with col2:
-    st.markdown("<h3 style='text-align:center;'>Geração/Atração de viagens</h3>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align:center;'>Geração e Atração de Viagens</h4>", unsafe_allow_html=True)
     st.pydeck_chart(pdk.Deck(layers=[choropleth_layer, text_layer], initial_view_state=view_state, map_style="mapbox://styles/mapbox/light-v9"))
     st.markdown("""
-        <div style='text-align:center; font-size: 14px; margin-top: -10px;'>
-            <b>Legenda:</b> tons de vermelho indicam maior geração de viagens. Tons claros indicam baixa geração.
+        <div style='text-align:center; font-size: 13px; margin-top: -5px;'>
+            <b>Legenda:</b> Escala de cor proporcional ao número de viagens por zona.
         </div>
     """, unsafe_allow_html=True)
 
 st.subheader("Tabela de pares OD filtrados")
 st.dataframe(df_filtrado.sort_values("volume", ascending=False))
+
