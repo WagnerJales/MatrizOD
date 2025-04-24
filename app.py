@@ -4,6 +4,9 @@ import pydeck as pdk
 import json
 from shapely.geometry import shape
 
+# Configuração da página deve vir antes de qualquer outro comando Streamlit
+st.set_page_config(layout="wide")
+
 # Carrega GeoJSON e CSV
 with open("zonas_OD.geojson", "r", encoding="utf-8") as f:
     geojson_data = json.load(f)
@@ -115,7 +118,6 @@ view_state = pdk.ViewState(
 )
 
 # Título e visualizações
-st.set_page_config(layout="wide")
 st.title("Visualizador de Matriz OD com GeoJSON")
 
 col1, col2 = st.columns(2)
