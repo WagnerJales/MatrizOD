@@ -4,16 +4,17 @@ import pydeck as pdk
 import json
 from shapely.geometry import shape
 
-# Configuração da página deve vir antes de qualquer outro comando Streamlit
 st.set_page_config(layout="wide")
 
-# Carrega GeoJSON e CSV
-with open("zonas_OD.geojson", "r", encoding="utf-8") as f:
-    geojson_data = json.load(f)
+@st.cache_data
+def load_data():
+    with open("zonas_OD.geojson", "r", encoding="utf-8") as f:
+        geojson_data = json.load(f)
+    df_od = pd.read_csv("matriz_od.csv")
+    return geojson_data, df_od
 
-df_od = pd.read_csv("matriz_od.csv")
+geojson_data, df_od = load_data()
 
-# Obter centroides a partir do GeoJSON
 zone_centroids = {}
 zone_trip_counts = {}
 for feature in geojson_data["features"]:
@@ -23,29 +24,30 @@ for feature in geojson_data["features"]:
     zone_centroids[zone_id] = (centroid.y, centroid.x)
     zone_trip_counts[zone_id] = 0
 
-# Calcular volume total por zona de origem
 total_by_zone = df_od.groupby("origem")["volume"].sum().to_dict()
 max_volume = max(total_by_zone.values()) if total_by_zone else 1
 for zone_id in zone_trip_counts:
     zone_trip_counts[zone_id] = total_by_zone.get(zone_id, 0)
 
-# Atualiza as propriedades com os totais
 for feature in geojson_data["features"]:
     zone_id = int(feature["properties"]["id"])
     feature["properties"]["volume"] = zone_trip_counts.get(zone_id, 0)
 
-# Adiciona coordenadas no DataFrame
-df_od["orig_lat"], df_od["orig_lon"] = zip(*df_od["origem"].map(lambda x: zone_centroids.get(x, (None, None))))
-df_od["dest_lat"], df_od["dest_lon"] = zip(*df_od["destino"].map(lambda x: zone_centroids.get(x, (None, None))))
+@st.cache_data
+def compute_coordinates(df):
+    df = df.copy()
+    df["orig_lat"], df["orig_lon"] = zip(*df["origem"].map(lambda x: zone_centroids.get(x, (None, None))))
+    df["dest_lat"], df["dest_lon"] = zip(*df["destino"].map(lambda x: zone_centroids.get(x, (None, None))))
+    return df
 
-# Filtros
+df_od = compute_coordinates(df_od)
+
 with st.sidebar:
     st.markdown("## Filtros")
     origem_sel = st.selectbox("Origem", ["Todas"] + sorted(df_od["origem"].unique().tolist()))
     destino_sel = st.selectbox("Destino", ["Todas"] + sorted(df_od["destino"].unique().tolist()))
     vol_range = st.slider("Volume", 0, int(df_od["volume"].max()), (0, int(df_od["volume"].max())))
 
-# Filtragem
 df_filtrado = df_od.copy()
 if origem_sel != "Todas":
     df_filtrado = df_filtrado[df_filtrado["origem"] == origem_sel]
@@ -53,18 +55,19 @@ if destino_sel != "Todas":
     df_filtrado = df_filtrado[df_filtrado["destino"] == destino_sel]
 df_filtrado = df_filtrado[(df_filtrado["volume"] >= vol_range[0]) & (df_filtrado["volume"] <= vol_range[1])]
 
-# Criar linhas OD
+# Limita visualmente para performance
+df_limitado = df_filtrado.head(500)
+
 od_lines = [
     {
         "from_lat": row.orig_lat, "from_lon": row.orig_lon,
         "to_lat": row.dest_lat, "to_lon": row.dest_lon,
         "volume": row.volume
     }
-    for _, row in df_filtrado.iterrows()
+    for _, row in df_limitado.iterrows()
     if pd.notnull(row.orig_lat) and pd.notnull(row.dest_lat)
 ]
 
-# Layers de mapas
 geo_layer = pdk.Layer(
     "GeoJsonLayer",
     geojson_data,
@@ -113,14 +116,12 @@ text_layer = pdk.Layer(
     billboard=True
 )
 
-# View inicial
 view_state = pdk.ViewState(
     latitude=sum(c[0] for c in zone_centroids.values()) / len(zone_centroids),
     longitude=sum(c[1] for c in zone_centroids.values()) / len(zone_centroids),
     zoom=11
 )
 
-# Layout tipo "dashboard" com título centralizado e mapas lado a lado
 st.markdown("""
     <div style='text-align:center'>
         <h1 style='margin-bottom: 10px;'>Matriz OD</h1>
@@ -141,6 +142,5 @@ with col2:
         </div>
     """, unsafe_allow_html=True)
 
-# Tabela final
 st.subheader("Tabela de pares OD filtrados")
 st.dataframe(df_filtrado.sort_values("volume", ascending=False))
