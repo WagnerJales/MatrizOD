@@ -4,8 +4,8 @@ import pandas as pd
 import pydeck as pdk
 import os
 
-# Carregamento de dados
-gdf = gpd.read_file("zonas_OD/zonas_OD.shp")
+# Carregamento de dados com engine=fiona para evitar erros com pyogrio
+gdf = gpd.read_file("zonas_OD/zonas_OD.shp", engine="fiona")
 od_df = pd.read_csv("matriz_od.csv")
 
 # Centroides das zonas para ligação OD
