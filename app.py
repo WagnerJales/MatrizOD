@@ -3,6 +3,11 @@ import pandas as pd
 import pydeck as pdk
 import json
 from shapely.geometry import shape
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import streamlit.components.v1 as components
+import base64
+from io import BytesIO
 
 st.set_page_config(layout="wide")
 
@@ -45,7 +50,6 @@ with st.sidebar:
     origem_sel = st.selectbox("Origem", ["Todas"] + sorted(df_od["origem"].unique().tolist()))
     destino_sel = st.selectbox("Destino", ["Todas"] + sorted(df_od["destino"].unique().tolist()))
     vol_range = st.slider("Volume", 0, int(df_od["volume"].max()), (0, int(df_od["volume"].max())))
-
     st.markdown("### Tipo de Visualização")
     tipo_dado = st.radio("Exibir no 2º mapa:", ["total", "geracao", "atracao"], index=0)
 
@@ -124,6 +128,16 @@ view_state = pdk.ViewState(
     zoom=11
 )
 
+# Gerar legenda como imagem
+fig, ax = plt.subplots(figsize=(4, 0.4))
+cmap = mpl.cm.Reds
+norm = mpl.colors.Normalize(vmin=0, vmax=max_valor)
+cb = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
+buf = BytesIO()
+plt.savefig(buf, format="png", bbox_inches="tight", transparent=True)
+base64_image = base64.b64encode(buf.getvalue()).decode()
+plt.close(fig)
+
 st.markdown("""
     <div style='text-align:center'>
         <h1 style='margin-bottom: 10px;'>Matriz OD</h1>
@@ -139,12 +153,11 @@ with col1:
 with col2:
     st.markdown("<h4 style='text-align:center;'>Geração e Atração de Viagens</h4>", unsafe_allow_html=True)
     st.pydeck_chart(pdk.Deck(layers=[choropleth_layer, text_layer], initial_view_state=view_state, map_style="mapbox://styles/mapbox/light-v9"))
-    st.markdown("""
-        <div style='text-align:center; font-size: 13px; margin-top: -5px;'>
-            <b>Legenda:</b> Escala de cor proporcional ao número de viagens por zona.
+    st.markdown(f"""
+        <div style='text-align:center;'>
+            <img src='data:image/png;base64,{base64_image}'/>
         </div>
     """, unsafe_allow_html=True)
 
 st.subheader("Tabela de pares OD filtrados")
 st.dataframe(df_filtrado.sort_values("volume", ascending=False))
-
