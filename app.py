@@ -18,12 +18,35 @@ def load_data():
     df_individual = pd.read_csv("matriz_od_individual.csv")
     return geojson_data, df_coletivo, df_individual
 
-geojson_data, df_coletivo, df_individual = load_data()
+# Funções para processar os modos
+@st.cache_data
+def process_modo(df_od, zone_centroids):
+    total_geracao = df_od.groupby("origem")["volume"].sum().to_dict()
+    total_atracao = df_od.groupby("destino")["volume"].sum().to_dict()
+    for feature in geojson_data["features"]:
+        zone_id = int(feature["properties"]["id"])
+        geom = shape(feature["geometry"])
+        centroid = geom.centroid
+        zone_centroids[zone_id] = (centroid.y, centroid.x)
+        geracao = total_geracao.get(zone_id, 0)
+        atracao = total_atracao.get(zone_id, 0)
+        feature["properties"]["geracao"] = geracao
+        feature["properties"]["atracao"] = atracao
+        feature["properties"]["total"] = geracao + atracao
+    return zone_centroids, geojson_data
 
-# Seleção de tipo de transporte
+@st.cache_data
+def compute_coordinates(df, zone_centroids):
+    df = df.copy()
+    df["orig_lat"], df["orig_lon"] = zip(*df["origem"].map(lambda x: zone_centroids.get(x, (None, None))))
+    df["dest_lat"], df["dest_lon"] = zip(*df["destino"].map(lambda x: zone_centroids.get(x, (None, None))))
+    return df
+
+# Inicializar dados
+geojson_data, df_coletivo, df_individual = load_data()
 modo = st.sidebar.radio("Modo de transporte", ["Transporte Coletivo", "Transporte Individual", "Total dos Dois"])
 
-# Combinar conforme a seleção
+# Seleção de dados
 if modo == "Transporte Coletivo":
     df_od = df_coletivo.copy()
 elif modo == "Transporte Individual":
@@ -31,30 +54,10 @@ elif modo == "Transporte Individual":
 else:
     df_od = pd.concat([df_coletivo, df_individual]).groupby(["origem", "destino"]).sum().reset_index()
 
-# Calcular centroides e totais por zona
+# Processar centroides e propriedades
 zone_centroids = {}
-total_geracao = df_od.groupby("origem")["volume"].sum().to_dict()
-total_atracao = df_od.groupby("destino")["volume"].sum().to_dict()
-
-for feature in geojson_data["features"]:
-    zone_id = int(feature["properties"]["id"])
-    geom = shape(feature["geometry"])
-    centroid = geom.centroid
-    zone_centroids[zone_id] = (centroid.y, centroid.x)
-    geracao = total_geracao.get(zone_id, 0)
-    atracao = total_atracao.get(zone_id, 0)
-    feature["properties"]["geracao"] = geracao
-    feature["properties"]["atracao"] = atracao
-    feature["properties"]["total"] = geracao + atracao
-
-@st.cache_data
-def compute_coordinates(df):
-    df = df.copy()
-    df["orig_lat"], df["orig_lon"] = zip(*df["origem"].map(lambda x: zone_centroids.get(x, (None, None))))
-    df["dest_lat"], df["dest_lon"] = zip(*df["destino"].map(lambda x: zone_centroids.get(x, (None, None))))
-    return df
-
-df_od = compute_coordinates(df_od)
+zone_centroids, geojson_data = process_modo(df_od, zone_centroids)
+df_od = compute_coordinates(df_od, zone_centroids)
 
 # Filtros interativos
 with st.sidebar:
@@ -180,8 +183,8 @@ if modo != "Total dos Dois":
     df_chart = df_filtrado.copy()
     df_chart["modo"] = modo_label
 else:
-    df_c = compute_coordinates(df_coletivo)
-    df_i = compute_coordinates(df_individual)
+    df_c = compute_coordinates(df_coletivo, zone_centroids)
+    df_i = compute_coordinates(df_individual, zone_centroids)
     df_c["modo"] = "Coletivo"
     df_i["modo"] = "Individual"
     df_chart = pd.concat([df_c, df_i])
