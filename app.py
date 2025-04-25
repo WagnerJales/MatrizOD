@@ -3,11 +3,6 @@ import pandas as pd
 import pydeck as pdk
 import json
 from shapely.geometry import shape
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import streamlit.components.v1 as components
-import base64
-from io import BytesIO
 
 st.set_page_config(layout="wide")
 
@@ -128,16 +123,6 @@ view_state = pdk.ViewState(
     zoom=11
 )
 
-# Gerar legenda como imagem
-fig, ax = plt.subplots(figsize=(4, 0.4))
-cmap = mpl.cm.Reds
-norm = mpl.colors.Normalize(vmin=0, vmax=max_valor)
-cb = mpl.colorbar.ColorbarBase(ax, cmap=cmap, norm=norm, orientation='horizontal')
-buf = BytesIO()
-plt.savefig(buf, format="png", bbox_inches="tight", transparent=True)
-base64_image = base64.b64encode(buf.getvalue()).decode()
-plt.close(fig)
-
 st.markdown("""
     <div style='text-align:center'>
         <h1 style='margin-bottom: 10px;'>Matriz OD</h1>
@@ -154,10 +139,15 @@ with col2:
     st.markdown("<h4 style='text-align:center;'>Geração e Atração de Viagens</h4>", unsafe_allow_html=True)
     st.pydeck_chart(pdk.Deck(layers=[choropleth_layer, text_layer], initial_view_state=view_state, map_style="mapbox://styles/mapbox/light-v9"))
     st.markdown(f"""
-        <div style='text-align:center;'>
-            <img src='data:image/png;base64,{base64_image}'/>
+        <div style='text-align:center; margin-top: -10px;'>
+            <div style='background: linear-gradient(to right, #f5e0e0, #ff0000); height: 20px; width: 80%; margin: 0 auto; border: 1px solid #aaa;'></div>
+            <div style='display: flex; justify-content: space-between; font-size: 12px; color: #333; width: 80%; margin: 2px auto;'>
+                <span>0</span>
+                <span>{int(max_valor)}</span>
+            </div>
         </div>
     """, unsafe_allow_html=True)
 
 st.subheader("Tabela de pares OD filtrados")
 st.dataframe(df_filtrado.sort_values("volume", ascending=False))
+
