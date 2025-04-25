@@ -114,14 +114,14 @@ line_layer = pdk.Layer(
     get_source_position=["from_lon", "from_lat"],
     get_target_position=["to_lon", "to_lat"],
     get_width="volume",
-    get_color=[255, 0, 0],
+    get_color="[255, 0, 0, 128]",  # 50% de transparência
     pickable=True
 )
 
 choropleth_layer = pdk.Layer(
     "GeoJsonLayer",
     geojson_data,
-    get_fill_color=f"[255 * properties.{tipo_dado} / {max_valor}, 100, 100, 180]",
+    get_fill_color=f"[255, 255 * (1 - properties.{tipo_dado} / {max_valor}), 255 * (1 - properties.{tipo_dado} / {max_valor}), 180]",
     get_line_color=[90, 90, 90, 120],
     pickable=True,
     filled=True,
