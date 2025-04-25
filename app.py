@@ -171,12 +171,6 @@ with col2:
         </div>
     """, unsafe_allow_html=True)
 
-# Exibir tabela filtrada
-st.subheader("Tabela de pares OD filtrados")
-df_exibicao = df_filtrado[["origem", "destino", "volume"]].copy()
-df_exibicao["volume"] = df_exibicao["volume"].map(lambda x: f"{x:,.1f}".replace(",", "X").replace(".", ",").replace("X", "."))
-st.dataframe(df_exibicao)
-
 # Total de viagens
 st.markdown(f"**Total de viagens filtradas:** {df_filtrado['volume'].sum():,.1f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
