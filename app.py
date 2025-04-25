@@ -198,4 +198,3 @@ st.plotly_chart(fig, use_container_width=True)
 st.markdown("""
 <small>Fonte: Os dados foram retirados da Tabela 2-8, do documento P8-Avaliação da Infraestrutura urbana, viária e de mobilidade, disponível em <a href='https://www.saoluis.ma.gov.br/arquivos/etapa_8_plano_de_mobilidade_08125036.pdf' target='_blank'>saoluis.ma.gov.br</a>.</small>
 """, unsafe_allow_html=True)
-
