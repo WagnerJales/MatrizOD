@@ -4,6 +4,7 @@ import pandas as pd
 import pydeck as pdk
 import json
 from shapely.geometry import shape
+import plotly.express as px
 
 # Configurar layout da página
 st.set_page_config(layout="wide")
@@ -13,14 +14,25 @@ st.set_page_config(layout="wide")
 def load_data():
     with open("zonas_OD.geojson", "r", encoding="utf-8") as f:
         geojson_data = json.load(f)
-    df_od = pd.read_csv("matriz_od.csv")
-    return geojson_data, df_od
+    df_coletivo = pd.read_csv("matriz_od_coletivo.csv")
+    df_individual = pd.read_csv("matriz_od_individual.csv")
+    return geojson_data, df_coletivo, df_individual
 
-geojson_data, df_od = load_data()
+geojson_data, df_coletivo, df_individual = load_data()
+
+# Seleção de tipo de transporte
+modo = st.sidebar.radio("Modo de transporte", ["Transporte Coletivo", "Transporte Individual", "Total dos Dois"])
+
+# Combinar conforme a seleção
+if modo == "Transporte Coletivo":
+    df_od = df_coletivo.copy()
+elif modo == "Transporte Individual":
+    df_od = df_individual.copy()
+else:
+    df_od = pd.concat([df_coletivo, df_individual]).groupby(["origem", "destino"]).sum().reset_index()
 
 # Calcular centroides e totais por zona
 zone_centroids = {}
-zone_trip_counts = {}
 total_geracao = df_od.groupby("origem")["volume"].sum().to_dict()
 total_atracao = df_od.groupby("destino")["volume"].sum().to_dict()
 
@@ -35,7 +47,6 @@ for feature in geojson_data["features"]:
     feature["properties"]["atracao"] = atracao
     feature["properties"]["total"] = geracao + atracao
 
-# Calcular coordenadas para pares OD
 @st.cache_data
 def compute_coordinates(df):
     df = df.copy()
@@ -54,16 +65,15 @@ with st.sidebar:
     st.markdown("### Tipo de Visualização")
     tipo_dado = st.radio("Exibir no 2º mapa:", ["total", "geracao", "atracao"], index=0)
 
-# Aplicar filtros
 max_valor = max([f["properties"][tipo_dado] for f in geojson_data["features"]]) or 1
 
+# Aplicar filtros
 df_filtrado = df_od.copy()
 df_filtrado = df_filtrado[df_filtrado["origem"].isin(origem_sel)]
 df_filtrado = df_filtrado[df_filtrado["destino"].isin(destino_sel)]
 df_filtrado = df_filtrado[(df_filtrado["volume"] >= vol_range[0]) & (df_filtrado["volume"] <= vol_range[1])]
 df_limitado = df_filtrado.head(500)
 
-# Criar linhas de conexão OD
 od_lines = [
     {
         "from_lat": row.orig_lat, "from_lon": row.orig_lon,
@@ -74,7 +84,6 @@ od_lines = [
     if pd.notnull(row.orig_lat) and pd.notnull(row.dest_lat)
 ]
 
-# Layers dos mapas
 geo_layer = pdk.Layer(
     "GeoJsonLayer",
     geojson_data,
@@ -123,7 +132,6 @@ text_layer = pdk.Layer(
     billboard=True
 )
 
-# Configurar visualização do mapa
 view_state = pdk.ViewState(
     latitude=sum(c[0] for c in zone_centroids.values()) / len(zone_centroids),
     longitude=sum(c[1] for c in zone_centroids.values()) / len(zone_centroids),
@@ -166,7 +174,28 @@ st.dataframe(df_exibicao)
 # Total de viagens
 st.markdown(f"**Total de viagens filtradas:** {df_filtrado['volume'].sum():,.1f}".replace(",", "X").replace(".", ",").replace("X", "."))
 
+# Gráfico por tipo
+if modo != "Total dos Dois":
+    modo_label = "Coletivo" if modo == "Transporte Coletivo" else "Individual"
+    df_chart = df_filtrado.copy()
+    df_chart["modo"] = modo_label
+else:
+    df_c = compute_coordinates(df_coletivo)
+    df_i = compute_coordinates(df_individual)
+    df_c["modo"] = "Coletivo"
+    df_i["modo"] = "Individual"
+    df_chart = pd.concat([df_c, df_i])
+    df_chart = df_chart[df_chart["origem"].isin(origem_sel) & df_chart["destino"].isin(destino_sel)]
+    df_chart = df_chart[(df_chart["volume"] >= vol_range[0]) & (df_chart["volume"] <= vol_range[1])]
+
+st.subheader("Gráfico de Viagens por Par OD e Tipo de Transporte")
+df_chart["par"] = df_chart["origem"].astype(str) + " - " + df_chart["destino"].astype(str)
+fig = px.bar(df_chart, x="par", y="volume", color="modo", barmode="group",
+             labels={"par": "Par OD", "volume": "Volume de Viagens", "modo": "Modo"})
+st.plotly_chart(fig, use_container_width=True)
+
 # Fonte dos dados
 st.markdown("""
 <small>Fonte: Os dados foram retirados da Tabela 2-8, do documento P8-Avaliação da Infraestrutura urbana, viária e de mobilidade, disponível em <a href='https://www.saoluis.ma.gov.br/arquivos/etapa_8_plano_de_mobilidade_08125036.pdf' target='_blank'>saoluis.ma.gov.br</a>.</small>
 """, unsafe_allow_html=True)
+
