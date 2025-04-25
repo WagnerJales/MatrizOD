@@ -209,4 +209,3 @@ st.markdown("""
     Desenvolvido por <a href='https://www.linkedin.com/in/wagner-jales-663b4831/' target='_blank'>Wagner Jales</a>
 </div>
 """, unsafe_allow_html=True)
-
