@@ -52,7 +52,10 @@ if modo == "Transporte Coletivo":
 elif modo == "Transporte Individual":
     df_od = df_individual.copy()
 else:
-    df_od = pd.concat([df_coletivo, df_individual]).groupby(["origem", "destino"]).sum().reset_index()
+    df_coletivo["modo"] = "Coletivo"
+    df_individual["modo"] = "Individual"
+    df_od = pd.concat([df_coletivo, df_individual])
+    df_od = df_od.groupby(["origem", "destino", "modo"]).sum().reset_index()
 
 # Processar centroides e propriedades
 zone_centroids = {}
@@ -183,12 +186,7 @@ if modo != "Total dos Dois":
     df_chart = df_filtrado.copy()
     df_chart["modo"] = modo_label
 else:
-    df_c = compute_coordinates(df_coletivo, zone_centroids)
-    df_i = compute_coordinates(df_individual, zone_centroids)
-    df_c["modo"] = "Coletivo"
-    df_i["modo"] = "Individual"
-    df_chart = pd.concat([df_c, df_i])
-    df_chart = df_chart[df_chart["origem"].isin(origem_sel) & df_chart["destino"].isin(destino_sel)]
+    df_chart = df_od[df_od["origem"].isin(origem_sel) & df_od["destino"].isin(destino_sel)]
     df_chart = df_chart[(df_chart["volume"] >= vol_range[0]) & (df_chart["volume"] <= vol_range[1])]
 
 st.subheader("Gráfico de Viagens por Par OD e Tipo de Transporte")
