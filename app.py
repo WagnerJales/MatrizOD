@@ -65,11 +65,18 @@ df_od = compute_coordinates(df_od, zone_centroids)
 # Filtros interativos
 with st.sidebar:
     st.markdown("## Filtros")
-    origem_sel = st.multiselect("Origem", sorted(df_od["origem"].unique().tolist()), default=df_od["origem"].unique().tolist())
-    destino_sel = st.multiselect("Destino", sorted(df_od["destino"].unique().tolist()), default=df_od["destino"].unique().tolist())
+    todas_origens = sorted(df_od["origem"].unique().tolist())
+    todas_destinos = sorted(df_od["destino"].unique().tolist())
+    origem_sel = st.multiselect("Origem", ["Todos"] + todas_origens, default=["Todos"])
+    destino_sel = st.multiselect("Destino", ["Todos"] + todas_destinos, default=["Todos"])
     vol_range = st.slider("Volume", 0, int(df_od["volume"].max()), (0, int(df_od["volume"].max())))
     st.markdown("### Tipo de Visualização")
     tipo_dado = st.radio("Exibir no 2º mapa:", ["total", "geracao", "atracao"], index=0)
+
+if "Todos" in origem_sel:
+    origem_sel = todas_origens
+if "Todos" in destino_sel:
+    destino_sel = todas_destinos
 
 max_valor = max([f["properties"][tipo_dado] for f in geojson_data["features"]]) or 1
 
@@ -147,7 +154,7 @@ view_state = pdk.ViewState(
 # Título principal
 st.markdown("""
     <div style='text-align:center'>
-        <h1 style='margin-bottom: 10px;'>Matriz Origem/Destino Ilha de São Luís</h1>
+        <h1 style='margin-bottom: 10px;'>Matriz Origem/Destino da Ilha de São Luís</h1>
     </div>
 """, unsafe_allow_html=True)
 
@@ -171,8 +178,13 @@ with col2:
         </div>
     """, unsafe_allow_html=True)
 
-# Total de viagens
-st.markdown(f"**Total de viagens filtradas:** {df_filtrado['volume'].sum():,.1f}".replace(",", "X").replace(".", ",").replace("X", "."))
+# Total de viagens - destaque com fonte maior
+total_viagens = round(df_filtrado['volume'].sum())
+st.markdown(f"""
+<div style='font-size:22px; font-weight:bold; text-align:center; padding: 10px;'>
+    Total de viagens filtradas: {total_viagens:,d}
+</div>
+""".replace(",", "X").replace(".", ",").replace("X", "."), unsafe_allow_html=True)
 
 # Gráfico por tipo
 if modo != "Total dos Dois":
