@@ -42,8 +42,8 @@ df_od = compute_coordinates(df_od)
 
 with st.sidebar:
     st.markdown("## Filtros")
-    origem_sel = st.selectbox("Origem", ["Todas"] + sorted(df_od["origem"].unique().tolist()))
-    destino_sel = st.selectbox("Destino", ["Todas"] + sorted(df_od["destino"].unique().tolist()))
+    origem_sel = st.multiselect("Origem", sorted(df_od["origem"].unique().tolist()), default=df_od["origem"].unique().tolist())
+    destino_sel = st.multiselect("Destino", sorted(df_od["destino"].unique().tolist()), default=df_od["destino"].unique().tolist())
     vol_range = st.slider("Volume", 0, int(df_od["volume"].max()), (0, int(df_od["volume"].max())))
     st.markdown("### Tipo de Visualização")
     tipo_dado = st.radio("Exibir no 2º mapa:", ["total", "geracao", "atracao"], index=0)
@@ -52,10 +52,8 @@ max_valor = max([f["properties"][tipo_dado] for f in geojson_data["features"]]) 
 
 # Filtragem principal
 df_filtrado = df_od.copy()
-if origem_sel != "Todas":
-    df_filtrado = df_filtrado[df_filtrado["origem"] == origem_sel]
-if destino_sel != "Todas":
-    df_filtrado = df_filtrado[df_filtrado["destino"] == destino_sel]
+df_filtrado = df_filtrado[df_filtrado["origem"].isin(origem_sel)]
+df_filtrado = df_filtrado[df_filtrado["destino"].isin(destino_sel)]
 df_filtrado = df_filtrado[(df_filtrado["volume"] >= vol_range[0]) & (df_filtrado["volume"] <= vol_range[1])]
 df_limitado = df_filtrado.head(500)
 
@@ -149,5 +147,14 @@ with col2:
     """, unsafe_allow_html=True)
 
 st.subheader("Tabela de pares OD filtrados")
-st.dataframe(df_filtrado.sort_values("volume", ascending=False))
+df_exibicao = df_filtrado[["origem", "destino", "volume"]].copy()
+df_exibicao["volume"] = df_exibicao["volume"].map(lambda x: f"{x:,.1f}".replace(",", "X").replace(".", ",").replace("X", "."))
+st.dataframe(df_exibicao)
+
+st.markdown(f"**Total de viagens filtradas:** {df_filtrado['volume'].sum():,.1f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
+st.markdown("""
+<small>Fonte: Os dados foram retirados da Tabela 2-8, do documento P8-Avaliação da Infraestrutura urbana, viária e de mobilidade, disponível em <a href='https://www.saoluis.ma.gov.br/arquivos/etapa_8_plano_de_mobilidade_08125036.pdf' target='_blank'>saoluis.ma.gov.br</a>.</small>
+""", unsafe_allow_html=True)
+
 
