@@ -207,6 +207,6 @@ st.markdown("""
     <strong>Fonte:</strong> Os dados foram retirados da Tabela 2-8, do documento 'P8-Avaliação da Infraestrutura urbana, viária e de mobilidade'. 
     Neste documento só identifica a geração e atração de viagens, a matriz foi estimada,<br>
     disponível em <a href='https://www.saoluis.ma.gov.br/arquivos/etapa_8_plano_de_mobilidade_08125036.pdf' target='_blank'>saoluis.ma.gov.br</a>.<br>
-    Desenvolvido por <a href='https://www.linkedin.com/in/wagner-jales-663b4831/' target='_blank'>Wagner Jales</a>
+    Desenvolvido por <a href='https://www.wagnerjales.com.br' target='_blank'>Wagner Jales</a>
 </div>
 """, unsafe_allow_html=True)
